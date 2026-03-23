@@ -113,7 +113,10 @@ import { FormsModule } from '@angular/forms';
               <lucide-icon name="database" size="18" class="text-muted"></lucide-icon>
               <h3 class="section-title mb-0">Live Output Stream</h3>
             </div>
-            <div class="flex gap-2">
+            <div class="flex gap-2 items-center">
+              <button class="icon-btn mr-2" (mousedown)="refreshData()" [disabled]="isRefreshing" title="Refresh Now">
+                <lucide-icon name="rotate-cw" size="16" [class.spin]="isRefreshing"></lucide-icon>
+              </button>
               <button class="tab-btn" [class.active]="activeLog === 'output'" (click)="loadLog('output')">Latest Results</button>
               <button class="tab-btn" [class.active]="activeLog === 'log'" (click)="loadLog('log')">signalPulse.log</button>
             </div>
@@ -199,6 +202,10 @@ import { FormsModule } from '@angular/forms';
     .tab-btn:hover { color: var(--text-main); background: rgba(255,255,255,0.05); }
     .tab-btn.active { background: rgba(99,102,241,0.15); color: var(--primary-color); }
 
+    .icon-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; transition: 0.2s; }
+    .icon-btn:hover { color: var(--text-main); }
+    .icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
     .results-list { height: 100%; overflow-y: auto; }
     .res-link { color: #58a6ff; text-decoration: none; transition: 0.2s; font-size: 0.9rem; }
     .res-link:hover { color: #79c0ff; text-decoration: underline; }
@@ -217,6 +224,7 @@ export class DashboardComponent implements OnInit, AfterViewChecked {
   isPaused = false;
   isRunning = true;
   isTriggering = false;
+  isRefreshing = false;
   activeLog = 'output';
   logContent = 'Loading log stream...';
   todayEntries: { name: string; time: string; timeMins: number; status: 'COMPLETED' | 'RUNNING' | 'UPCOMING' }[] = [];
@@ -234,11 +242,7 @@ export class DashboardComponent implements OnInit, AfterViewChecked {
     this.api.loadLatestResults();
     this.loadLog('log'); // Default to signalPulse.log as it's more "live"
 
-    // Refresh every minute so COMPLETED/RUNNING/UPCOMING updates in real time
-    setInterval(() => {
-      this.buildTodayEntries();
-      this.api.loadLatestResults();
-    }, 60_000);
+    // Removed auto-polling setInterval per user request - switching to on-demand loading
 
     // Wait for schedules to load, then build
     setTimeout(() => this.buildTodayEntries(), 1200);
@@ -318,10 +322,32 @@ export class DashboardComponent implements OnInit, AfterViewChecked {
     });
   }
 
+  refreshData() {
+    this.isRefreshing = true;
+    this.buildTodayEntries();
+    this.api.loadLatestResults();
+    this.api.loadStats();
+    
+    // Also reload whichever log is active
+    if (this.activeLog === 'log') {
+      this.api.getArtifact('signalPulse.log').subscribe({
+        next: content => {
+          this.logContent = content;
+          this.isRefreshing = false;
+        },
+        error: () => this.isRefreshing = false
+      });
+    } else {
+      setTimeout(() => this.isRefreshing = false, 800);
+    }
+  }
+
   loadLog(type: string) {
     this.activeLog = type;
     if (type === 'log') {
       this.api.getArtifact('signalPulse.log').subscribe(content => this.logContent = content);
+    } else if (type === 'output') {
+      this.api.loadLatestResults();
     }
   }
 }
