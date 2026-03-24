@@ -1,13 +1,14 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
   private http = inject(HttpClient);
-  private baseUrl = 'http://localhost:9090/api/v1';
+  private baseUrl = (environment.ADMIN_ENDPOINT.endsWith('/') ? environment.ADMIN_ENDPOINT : environment.ADMIN_ENDPOINT + '/') + 'api/v1';
 
   // State using Signals
   feeds = signal<any[]>([]);

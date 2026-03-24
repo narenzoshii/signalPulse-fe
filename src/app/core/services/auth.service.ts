@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { catchError, map } from 'rxjs/operators';
 import { throwError } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
@@ -14,6 +15,7 @@ export class AuthService {
   private http = inject(HttpClient);
 
   private idleTimer: any;
+  private baseUrl = (environment.ADMIN_ENDPOINT.endsWith('/') ? environment.ADMIN_ENDPOINT : environment.ADMIN_ENDPOINT + '/') + 'api/v1';
 
   constructor(private router: Router) {
     if (this.isLoggedIn()) {
@@ -26,7 +28,7 @@ export class AuthService {
   }
 
   login(credentials: any) {
-    return this.http.post<any>('http://localhost:9090/api/v1/auth/login', credentials).pipe(
+    return this.http.post<any>(`${this.baseUrl}/auth/login`, credentials).pipe(
       map(res => {
         if (res.token) {
           localStorage.setItem('auth_token', res.token);
