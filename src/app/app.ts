@@ -16,7 +16,7 @@ import { CommonModule } from '@angular/common';
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
           <div class="brand">
-            <div class="logo-icon">LA</div>
+            <img src="assets/icons/icon.png" class="logo-img" alt="Logo">
             <div class="brand-text">
               <h2>Signal Pulse</h2>
               <span>Admin Portal</span>
@@ -118,18 +118,11 @@ import { CommonModule } from '@angular/common';
       border-bottom: 1px solid var(--border-light);
       gap: 12px;
     }
-    .logo-icon {
+    .logo-img {
       width: 36px;
       height: 36px;
-      background: linear-gradient(135deg, var(--primary-color), #c084fc);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      color: white;
-      font-size: 14px;
-      box-shadow: 0 2px 10px rgba(99, 102, 241, 0.3);
+      object-fit: contain;
+      border-radius: 4px;
     }
     .brand-text h2 {
       font-size: 1rem;
