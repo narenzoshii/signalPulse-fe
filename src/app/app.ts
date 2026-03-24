@@ -40,18 +40,18 @@ import { CommonModule } from '@angular/common';
               Source Manager
             </a>
             <a routerLink="/system" routerLinkActive="active" class="nav-item">
-              <lucide-icon name="settings" size="18"></lucide-icon>
+              <lucide-icon name="cog" size="18"></lucide-icon>
               System Settings
             </a>
 
             <ng-container *ngIf="authService.hasPermission('OP_MANAGE_USERS')">
               <p class="nav-label mt-6">Management</p>
               <a routerLink="/admin/users" routerLinkActive="active" class="nav-item">
-                <lucide-icon name="users" size="18"></lucide-icon>
+                <lucide-icon name="user-cog" size="18"></lucide-icon>
                 User Manager
               </a>
               <a routerLink="/admin/roles" routerLinkActive="active" class="nav-item">
-                <lucide-icon name="shield" size="18"></lucide-icon>
+                <lucide-icon name="shield-user" size="18"></lucide-icon>
                 Role & Privileges
               </a>
             </ng-container>
