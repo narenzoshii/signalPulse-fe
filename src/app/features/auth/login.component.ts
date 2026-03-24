@@ -13,7 +13,7 @@ import { LucideAngularModule } from 'lucide-angular';
       <div class="login-card glass slide-up">
         <div class="brand mb-6 text-center">
           <div class="logo-icon mx-auto mb-4">LA</div>
-          <h2>Lending Agent</h2>
+          <h2>Signal Pulse</h2>
           <p class="muted">Admin Portal Access</p>
         </div>
         

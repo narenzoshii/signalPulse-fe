@@ -18,7 +18,7 @@ import { CommonModule } from '@angular/common';
           <div class="brand">
             <div class="logo-icon">LA</div>
             <div class="brand-text">
-              <h2>Lending Agent</h2>
+              <h2>Signal Pulse</h2>
               <span>Admin Portal</span>
             </div>
           </div>
@@ -75,7 +75,7 @@ import { CommonModule } from '@angular/common';
         <main class="main-content">
           <header class="top-header">
             <div class="breadcrumb">
-              <span class="muted">Lending Agent</span> <span class="muted mx-2">/</span> <span class="current-route">Console</span>
+              <span class="muted">Signal Pulse</span> <span class="muted mx-2">/</span> <span class="current-route">Console</span>
             </div>
             <div class="header-actions flex gap-4 items-center">
               <button class="icon-btn tooltip" title="System Status: Healthy"><lucide-icon name="activity" size="20" class="success-text"></lucide-icon></button>
