@@ -138,7 +138,7 @@ import { FormsModule } from '@angular/forms';
                  </thead>
                  <tbody>
                    <tr *ngFor="let s of api.stats()?.recentResults" class="border-b border-light/5 hover:bg-white/5">
-                     <td class="py-3">{{ s.timestamp | date:'shortTime' }}</td>
+                     <td class="py-3">{{ s.timestamp | date:'medium' }}</td>
                      <td class="py-3">
                        <span class="badge-mini" [class.badge-mini-manual]="s.triggerType === 'MANUAL'">
                          {{ s.triggerType || 'AUTO' }}

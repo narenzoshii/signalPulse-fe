@@ -60,7 +60,7 @@ import { CommonModule } from '@angular/common';
 
           <div class="user-profile" (click)="authService.logout()">
             <div class="avatar">
-              <img src="https://ui-avatars.com/api/?name=Admin+User&background=6366f1&color=fff" alt="User">
+              <img [src]="'https://ui-avatars.com/api/?name=' + (authService.currentUser()?.username || 'G') + '&background=6366f1&color=fff'" alt="User">
             </div>
             <div class="user-info">
               <span class="user-name">{{ authService.currentUser()?.username || 'Guest' }}</span>
