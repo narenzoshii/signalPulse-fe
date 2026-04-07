@@ -48,7 +48,7 @@ import { FormsModule } from '@angular/forms';
             <span class="badge badge-success">+New</span>
           </div>
           <div class="stat-body mt-4">
-            <span class="label">New Articles Found</span>
+            <span class="label">Latest Scan Matches</span>
             <div class="value text-gradient">{{ api.stats()?.recentResults?.[0]?.newItemsCount || 0 }}</div>
           </div>
         </div>
@@ -113,12 +113,45 @@ import { FormsModule } from '@angular/forms';
               <lucide-icon name="database" size="18" class="text-muted"></lucide-icon>
               <h3 class="section-title mb-0">Live Output Stream</h3>
             </div>
-            <div class="flex gap-2">
-              <button class="tab-btn" [class.active]="activeLog === 'output'" (click)="loadLog('output')">Latest Results</button>
-              <button class="tab-btn" [class.active]="activeLog === 'log'" (click)="loadLog('log')">signalPulse.log</button>
+            <div class="flex gap-2 items-center">
+              <button class="icon-btn mr-2" (mousedown)="refreshData()" [disabled]="isRefreshing" title="Refresh Now">
+                <lucide-icon name="rotate-cw" size="16" [class.spin]="isRefreshing"></lucide-icon>
+              </button>
+              <div class="flex gap-2">
+                <button class="tab-btn" [class.active]="activeLog === 'output'" (click)="loadLog('output')">Latest Results</button>
+                <button class="tab-btn" [class.active]="activeLog === 'history'" (click)="loadLog('history')">Scan History</button>
+                <button class="tab-btn" [class.active]="activeLog === 'log'" (click)="loadLog('log')">signalPulse.log</button>
+              </div>
             </div>
           </div>
           <div class="log-viewer" #scrollContainer>
+            <div *ngIf="activeLog === 'history'" class="history-list p-4">
+               <table class="w-full text-xs text-left history-table">
+                 <thead class="text-muted border-b border-light">
+                   <tr>
+                     <th class="py-2">Time</th>
+                     <th class="py-2">Type</th>
+                     <th class="py-2">Found</th>
+                     <th class="py-2">Matches</th>
+                     <th class="py-2">Duration</th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   <tr *ngFor="let s of api.stats()?.recentResults" class="border-b border-light/5 hover:bg-white/5">
+                     <td class="py-3">{{ s.timestamp | date:'medium' }}</td>
+                     <td class="py-3">
+                       <span class="badge-mini" [class.badge-mini-manual]="s.triggerType === 'MANUAL'">
+                         {{ s.triggerType || 'AUTO' }}
+                       </span>
+                     </td>
+                     <td class="py-3">{{ s.articlesFound }}</td>
+                     <td class="py-3 text-primary">{{ s.newItemsCount }}</td>
+                     <td class="py-3 muted">{{ s.durationMs }}ms</td>
+                   </tr>
+                 </tbody>
+               </table>
+            </div>
+
             <pre *ngIf="activeLog === 'log'"><code>{{ logContent }}</code></pre>
             <div *ngIf="activeLog === 'output'" class="results-list p-4">
               <div *ngIf="api.latestResults().length === 0" class="muted text-center py-8">
@@ -199,6 +232,16 @@ import { FormsModule } from '@angular/forms';
     .tab-btn:hover { color: var(--text-main); background: rgba(255,255,255,0.05); }
     .tab-btn.active { background: rgba(99,102,241,0.15); color: var(--primary-color); }
 
+    .icon-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; transition: 0.2s; }
+    .icon-btn:hover { color: var(--text-main); }
+    .icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    .history-table th { font-weight: 600; text-transform: uppercase; color: var(--text-muted); }
+    .history-table td { border-bottom: 1px solid rgba(255,255,255,0.05); }
+    
+    .badge-mini { font-size: 0.6rem; padding: 1px 5px; border-radius: 4px; background: rgba(99,102,241,0.1); color: var(--primary-color); border: 1px solid rgba(99,102,241,0.2); }
+    .badge-mini-manual { background: rgba(245,158,11,0.1); color: var(--warning-color); border-color: rgba(245,158,11,0.3); }
+
     .results-list { height: 100%; overflow-y: auto; }
     .res-link { color: #58a6ff; text-decoration: none; transition: 0.2s; font-size: 0.9rem; }
     .res-link:hover { color: #79c0ff; text-decoration: underline; }
@@ -217,9 +260,10 @@ export class DashboardComponent implements OnInit, AfterViewChecked {
   isPaused = false;
   isRunning = true;
   isTriggering = false;
+  isRefreshing = false;
   activeLog = 'output';
   logContent = 'Loading log stream...';
-  todayEntries: { name: string; time: string; timeMins: number; status: 'COMPLETED' | 'RUNNING' | 'UPCOMING' }[] = [];
+  todayEntries: { name: string; time: string; timeMins: number; status: 'COMPLETED' | 'RUNNING' | 'UPCOMING'; triggerType?: string }[] = [];
 
   private readonly DOW_MAP: Record<string, number> = {
     SUNDAY: 0, MONDAY: 1, TUESDAY: 2, WEDNESDAY: 3,
@@ -234,11 +278,7 @@ export class DashboardComponent implements OnInit, AfterViewChecked {
     this.api.loadLatestResults();
     this.loadLog('log'); // Default to signalPulse.log as it's more "live"
 
-    // Refresh every minute so COMPLETED/RUNNING/UPCOMING updates in real time
-    setInterval(() => {
-      this.buildTodayEntries();
-      this.api.loadLatestResults();
-    }, 60_000);
+    // Removed auto-polling setInterval per user request - switching to on-demand loading
 
     // Wait for schedules to load, then build
     setTimeout(() => this.buildTodayEntries(), 1200);
@@ -278,6 +318,10 @@ export class DashboardComponent implements OnInit, AfterViewChecked {
 
         const timeMins = h * 60 + m;
         const diff = timeMins - nowMins;
+        
+        // Skip scheduled items that are in the past if we have actual results for them
+        if (diff < -30) continue; 
+
         let status: 'COMPLETED' | 'RUNNING' | 'UPCOMING';
         if (diff < -5)            status = 'COMPLETED';
         else if (diff <= 5)       status = 'RUNNING';
@@ -286,11 +330,37 @@ export class DashboardComponent implements OnInit, AfterViewChecked {
         const ampm = h >= 12 ? 'PM' : 'AM';
         const dh = h % 12 === 0 ? 12 : h % 12;
         const dm = m.toString().padStart(2, '0');
-        result.push({ name: s.name || 'Unnamed Job', time: `${dh}:${dm} ${ampm}`, timeMins, status });
+        result.push({ name: s.name || 'Unnamed Job', time: `${dh}:${dm} ${ampm}`, timeMins, status, triggerType: 'SCHEDULED' });
       }
     }
 
-    this.todayEntries = result.sort((a, b) => a.timeMins - b.timeMins);
+    // Add Actual recent scans (Manual and Scheduled)
+    const recentScans = this.api.stats()?.recentResults || [];
+    for (const scan of recentScans) {
+      const scanDate = new Date(scan.timestamp);
+      // Only show today's actual scans
+      if (scanDate.toDateString() !== now.toDateString()) continue;
+
+      const h = scanDate.getHours();
+      const m = scanDate.getMinutes();
+      const timeMins = h * 60 + m;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const dh = h % 12 === 0 ? 12 : h % 12;
+      const dm = m.toString().padStart(2, '0');
+      
+      result.push({
+        name: scan.triggerType === 'MANUAL' ? 'Manual Pulse Trigger' : 'Automated Scan Run',
+        time: `${dh}:${dm} ${ampm}`,
+        timeMins,
+        status: 'COMPLETED',
+        triggerType: scan.triggerType
+      });
+    }
+
+    // Sort and Deduplicate (if an automated scan overlaps with a scheduled slot)
+    this.todayEntries = result
+      .sort((a, b) => b.timeMins - a.timeMins) // newest first
+      .filter((v, i, a) => a.findIndex(t => t.time === v.time && t.name === v.name) === i);
   }
 
   togglePause() {
@@ -318,10 +388,34 @@ export class DashboardComponent implements OnInit, AfterViewChecked {
     });
   }
 
+  refreshData() {
+    this.isRefreshing = true;
+    this.buildTodayEntries();
+    this.api.loadLatestResults();
+    this.api.loadStats();
+    
+    // Also reload whichever log is active
+    if (this.activeLog === 'log') {
+      this.api.getArtifact('signalPulse.log').subscribe({
+        next: content => {
+          this.logContent = content;
+          this.isRefreshing = false;
+        },
+        error: () => this.isRefreshing = false
+      });
+    } else {
+      setTimeout(() => this.isRefreshing = false, 800);
+    }
+  }
+
   loadLog(type: string) {
     this.activeLog = type;
     if (type === 'log') {
       this.api.getArtifact('signalPulse.log').subscribe(content => this.logContent = content);
+    } else if (type === 'output') {
+      this.api.loadLatestResults();
+    } else if (type === 'history') {
+      this.api.loadStats();
     }
   }
 }

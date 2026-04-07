@@ -12,9 +12,10 @@ import { LucideAngularModule } from 'lucide-angular';
     <div class="login-container">
       <div class="login-card glass slide-up">
         <div class="brand mb-6 text-center">
-          <div class="logo-icon mx-auto mb-4">LA</div>
-          <h2>Lending Agent</h2>
-          <p class="muted">Admin Portal Access</p>
+          <div class="logo-wrapper">
+            <img src="assets/icons/logo.png" class="logo-img" alt="Logo">
+          </div>
+
         </div>
         
         <form (ngSubmit)="login()">
@@ -59,21 +60,28 @@ import { LucideAngularModule } from 'lucide-angular';
     }
     .slide-up { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     @keyframes slideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
-    
-    .logo-icon {
-      width: 56px;
-      height: 56px;
-      background: linear-gradient(135deg, var(--primary-color), #c084fc);
-      border-radius: 14px;
-      display: flex;
+
+    .logo-img {
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
+      border-radius: 12px;
+      padding: 8px;
+    }
+    .brand {
+      margin-bottom: 2rem;
+    }
+
+    .logo-wrapper {
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-weight: 700;
-      color: white;
-      font-size: 20px;
-      box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+      padding: 12px;
+      border-radius: 16px;
+      background: radial-gradient(circle, rgba(99,102,241,0.2), transparent);
     }
-    .brand h2 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+
+    .brand h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
     .muted { color: var(--text-muted); font-size: 0.9rem; }
   `]
 })

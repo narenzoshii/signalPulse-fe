@@ -16,9 +16,9 @@ import { CommonModule } from '@angular/common';
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
           <div class="brand">
-            <div class="logo-icon">LA</div>
+            <img src="assets/icons/logo.png" class="logo-img" alt="Logo">
             <div class="brand-text">
-              <h2>Lending Agent</h2>
+              <h2>Signal Pulse</h2>
               <span>Admin Portal</span>
             </div>
           </div>
@@ -40,18 +40,18 @@ import { CommonModule } from '@angular/common';
               Source Manager
             </a>
             <a routerLink="/system" routerLinkActive="active" class="nav-item">
-              <lucide-icon name="settings" size="18"></lucide-icon>
+              <lucide-icon name="cog" size="18"></lucide-icon>
               System Settings
             </a>
 
             <ng-container *ngIf="authService.hasPermission('OP_MANAGE_USERS')">
               <p class="nav-label mt-6">Management</p>
               <a routerLink="/admin/users" routerLinkActive="active" class="nav-item">
-                <lucide-icon name="users" size="18"></lucide-icon>
+                <lucide-icon name="user-cog" size="18"></lucide-icon>
                 User Manager
               </a>
               <a routerLink="/admin/roles" routerLinkActive="active" class="nav-item">
-                <lucide-icon name="shield" size="18"></lucide-icon>
+                <lucide-icon name="shield-user" size="18"></lucide-icon>
                 Role & Privileges
               </a>
             </ng-container>
@@ -60,7 +60,7 @@ import { CommonModule } from '@angular/common';
 
           <div class="user-profile" (click)="authService.logout()">
             <div class="avatar">
-              <img src="https://ui-avatars.com/api/?name=Admin+User&background=6366f1&color=fff" alt="User">
+              <img [src]="'https://ui-avatars.com/api/?name=' + (authService.currentUser()?.username || 'G') + '&background=6366f1&color=fff'" alt="User">
             </div>
             <div class="user-info">
               <span class="user-name">{{ authService.currentUser()?.username || 'Guest' }}</span>
@@ -75,7 +75,7 @@ import { CommonModule } from '@angular/common';
         <main class="main-content">
           <header class="top-header">
             <div class="breadcrumb">
-              <span class="muted">Lending Agent</span> <span class="muted mx-2">/</span> <span class="current-route">Console</span>
+              <span class="muted">Signal Pulse</span> <span class="muted mx-2">/</span> <span class="current-route">Console</span>
             </div>
             <div class="header-actions flex gap-4 items-center">
               <button class="icon-btn tooltip" title="System Status: Healthy"><lucide-icon name="activity" size="20" class="success-text"></lucide-icon></button>
@@ -118,19 +118,18 @@ import { CommonModule } from '@angular/common';
       border-bottom: 1px solid var(--border-light);
       gap: 12px;
     }
-    .logo-icon {
-      width: 36px;
-      height: 36px;
-      background: linear-gradient(135deg, var(--primary-color), #c084fc);
+
+
+    .logo-img {
+      width: 44px;
+      height: 44px;
+      object-fit: contain;
+      padding: 6px;
+      background-color: #1e293b;
       border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      color: white;
-      font-size: 14px;
-      box-shadow: 0 2px 10px rgba(99, 102, 241, 0.3);
+      box-shadow: 0 3px 10px rgba(0,0,0,0.3);
     }
+
     .brand-text h2 {
       font-size: 1rem;
       margin: 0;
