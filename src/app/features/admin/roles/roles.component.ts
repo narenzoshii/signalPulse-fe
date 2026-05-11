@@ -1,12 +1,15 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ApiService } from '../../../core/services/api.service';
 import { LucideAngularModule } from 'lucide-angular';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ApiService } from '../../../core/services/api.service';
+import { Privilege, Role, RoleRequest } from '../../../core/models';
 
 @Component({
   selector: 'app-roles',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule, FormsModule, LucideAngularModule],
   template: `
     <div class="admin-container">
@@ -23,13 +26,7 @@ import { LucideAngularModule } from 'lucide-angular';
       <div class="card glass mt-6">
         <div class="table-container">
           <table>
-            <thead>
-              <tr>
-                <th>Role Name</th>
-                <th>Privileges</th>
-                <th class="text-right">Actions</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Role Name</th><th>Privileges</th><th class="text-right">Actions</th></tr></thead>
             <tbody>
               @for (role of roles(); track role.id) {
                 <tr>
@@ -46,29 +43,31 @@ import { LucideAngularModule } from 'lucide-angular';
                   </td>
                   <td class="text-right">
                     <button class="icon-btn mr-1" (click)="openEdit(role)"><lucide-icon name="settings-2" size="16"></lucide-icon></button>
-                    <button class="icon-btn danger" (click)="deleteRole(role.id)"><lucide-icon name="trash-2" size="16"></lucide-icon></button>
+                    <button class="icon-btn danger" (click)="deleteRole(role)"><lucide-icon name="trash-2" size="16"></lucide-icon></button>
                   </td>
                 </tr>
+              }
+              @if (roles().length === 0) {
+                <tr><td colspan="3" class="text-center py-6 muted">No roles configured.</td></tr>
               }
             </tbody>
           </table>
         </div>
       </div>
 
-      <!-- Role Modal -->
-      @if (showModal) {
-        <div class="modal-backdrop">
-          <div class="modal card glass slide-up" style="max-width: 700px;">
+      @if (showModal()) {
+        <div class="modal-backdrop" (click)="showModal.set(false)">
+          <div class="modal card glass slide-up" style="max-width: 700px;" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
             <div class="modal-header">
               <h3>{{ editingRole ? 'Configure' : 'Create' }} Role</h3>
-              <button class="icon-btn" (click)="showModal = false"><lucide-icon name="x" size="20"></lucide-icon></button>
+              <button class="icon-btn" (click)="showModal.set(false)"><lucide-icon name="x" size="20"></lucide-icon></button>
             </div>
             <div class="modal-body mt-4">
               <div class="form-group">
                 <label>Role Name</label>
-                <input class="input" [(ngModel)]="formData.name" placeholder="e.g. EDITOR" [disabled]="!!editingRole && formData.name === 'SUPERADMIN'">
+                <input class="input" [(ngModel)]="formName" placeholder="e.g. EDITOR" [disabled]="!!editingRole && formName === 'SUPERADMIN'">
+                <span class="hint muted">Uppercase letters, digits, underscore.</span>
               </div>
-              
               <div class="form-group mt-6">
                 <label class="block mb-2">Privilege Matrix</label>
                 <div class="privilege-grid">
@@ -85,10 +84,15 @@ import { LucideAngularModule } from 'lucide-angular';
                   }
                 </div>
               </div>
+              @if (saveError()) {
+                <div class="alert alert-danger mt-3">{{ saveError() }}</div>
+              }
             </div>
             <div class="modal-footer mt-6 flex justify-end gap-2">
-              <button class="btn-secondary" (click)="showModal = false">Cancel</button>
-              <button class="btn-primary" (click)="saveRole()">Save Configuration</button>
+              <button class="btn-secondary" (click)="showModal.set(false)">Cancel</button>
+              <button class="btn-primary" (click)="saveRole()" [disabled]="saving()">
+                {{ saving() ? 'Saving…' : 'Save Configuration' }}
+              </button>
             </div>
           </div>
         </div>
@@ -107,28 +111,42 @@ import { LucideAngularModule } from 'lucide-angular';
     .p-desc { font-size: 0.75rem; color: var(--text-muted); }
     .mr-1 { margin-right: 4px; }
     .text-right { text-align: right; }
+    .alert-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); padding: 8px; border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 0.85rem; }
+    .hint { font-size: 0.75rem; margin-top: 4px; display: block; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   `]
 })
 export class RolesComponent implements OnInit {
   private api = inject(ApiService);
-  roles = signal<any[]>([]);
-  allPrivileges = signal<any[]>([]);
-  showModal = false;
-  editingRole: any = null;
-  formData: any = { privileges: [] };
+  private destroyRef = inject(DestroyRef);
 
-  ngOnInit() {
+  roles = signal<Role[]>([]);
+  allPrivileges = signal<Privilege[]>([]);
+  showModal = signal(false);
+  saving = signal(false);
+  saveError = signal<string | null>(null);
+
+  editingRole: Role | null = null;
+  formName = '';
+  private selectedPrivilegeIds = new Set<number>();
+
+  ngOnInit(): void {
     this.loadData();
   }
 
-  loadData() {
-    this.api.loadRoles().subscribe(r => this.roles.set(r));
-    this.api.loadPrivileges().subscribe(p => this.allPrivileges.set(p));
+  private loadData(): void {
+    this.api.loadRoles().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: r => this.roles.set(r),
+      error: err => console.error('loadRoles failed', err),
+    });
+    this.api.loadPrivileges().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: p => this.allPrivileges.set(p),
+      error: err => console.error('loadPrivileges failed', err),
+    });
   }
 
   getPrivilegeDesc(name: string): string {
-    switch(name) {
+    switch (name) {
       case 'OP_READ_ALL': return 'View dashboard, history and all sources';
       case 'OP_WRITE_SOURCES': return 'Add/Edit/Delete RSS feeds and HTML pages';
       case 'OP_WRITE_RULES': return 'Modify topic scoring and ranking patterns';
@@ -140,41 +158,55 @@ export class RolesComponent implements OnInit {
     }
   }
 
-  openCreate() {
+  openCreate(): void {
     this.editingRole = null;
-    this.formData = { name: '', privileges: [] };
-    this.showModal = true;
+    this.formName = '';
+    this.selectedPrivilegeIds = new Set();
+    this.saveError.set(null);
+    this.showModal.set(true);
   }
 
-  openEdit(role: any) {
+  openEdit(role: Role): void {
     this.editingRole = role;
-    this.formData = { ...role, privileges: [...role.privileges] };
-    this.showModal = true;
+    this.formName = role.name;
+    this.selectedPrivilegeIds = new Set(role.privileges.map(p => p.id));
+    this.saveError.set(null);
+    this.showModal.set(true);
   }
 
-  hasPrivilege(priv: any) {
-    return this.formData.privileges.some((p: any) => p.id === priv.id);
+  hasPrivilege(p: Privilege): boolean {
+    return this.selectedPrivilegeIds.has(p.id);
   }
 
-  togglePrivilege(priv: any) {
-    const idx = this.formData.privileges.findIndex((p: any) => p.id === priv.id);
-    if (idx > -1) {
-      this.formData.privileges.splice(idx, 1);
-    } else {
-      this.formData.privileges.push(priv);
+  togglePrivilege(p: Privilege): void {
+    if (this.selectedPrivilegeIds.has(p.id)) this.selectedPrivilegeIds.delete(p.id);
+    else this.selectedPrivilegeIds.add(p.id);
+  }
+
+  saveRole(): void {
+    if (this.saving()) return;
+    this.saveError.set(null);
+    if (!/^[A-Z][A-Z0-9_]*$/.test(this.formName)) {
+      this.saveError.set('Role name must be uppercase letters, digits or underscore.');
+      return;
     }
-  }
-
-  saveRole() {
-    this.api.saveRole(this.formData).subscribe(() => {
-      this.loadData();
-      this.showModal = false;
+    const payload: RoleRequest = {
+      id: this.editingRole?.id,
+      name: this.formName,
+      privilegeIds: [...this.selectedPrivilegeIds],
+    };
+    this.saving.set(true);
+    this.api.saveRole(payload).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.saving.set(false); this.loadData(); this.showModal.set(false); },
+      error: err => { this.saving.set(false); this.saveError.set(err?.error?.message ?? err?.message ?? 'Save failed'); },
     });
   }
 
-  deleteRole(id: number) {
-    if (confirm('Delete this role? Users assigned to it will lose these privileges.')) {
-      this.api.deleteRole(id).subscribe(() => this.loadData());
-    }
+  deleteRole(role: Role): void {
+    if (!confirm(`Delete role "${role.name}"? Users assigned to it will lose these privileges.`)) return;
+    this.api.deleteRole(role.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => this.loadData(),
+      error: err => console.error('deleteRole failed', err),
+    });
   }
 }

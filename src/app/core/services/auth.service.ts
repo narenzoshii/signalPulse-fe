@@ -1,82 +1,113 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { catchError, map } from 'rxjs/operators';
-import { throwError } from 'rxjs';
+import { Observable, catchError, map, of, tap, throwError, timeout } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { CurrentUser } from '../models';
 
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class AuthService {
-  public isLoggedIn = signal<boolean>(localStorage.getItem('auth_token') !== null);
-  public authorities = signal<string[]>(JSON.parse(localStorage.getItem('user_authorities') || '[]'));
-  public currentUser = signal<any>(JSON.parse(localStorage.getItem('current_user') || 'null'));
+  public isLoggedIn = signal<boolean>(false);
+  public authorities = signal<string[]>([]);
+  public currentUser = signal<CurrentUser['user'] | null>(null);
+
+  /** Resolves true once the initial /me probe has settled, so guards can wait. */
+  public ready = signal<boolean>(false);
+
   private http = inject(HttpClient);
+  private router = inject(Router);
+  private baseUrl =
+    (environment.ADMIN_ENDPOINT.endsWith('/')
+      ? environment.ADMIN_ENDPOINT
+      : environment.ADMIN_ENDPOINT + '/') + 'api/v1';
 
-  private idleTimer: any;
-  private baseUrl = (environment.ADMIN_ENDPOINT.endsWith('/') ? environment.ADMIN_ENDPOINT : environment.ADMIN_ENDPOINT + '/') + 'api/v1';
+  private idleTimer: ReturnType<typeof setTimeout> | undefined;
+  private idleListenersAttached = false;
+  private readonly idleEvents = ['mousedown', 'mousemove', 'keypress', 'touchstart'] as const;
 
-  constructor(private router: Router) {
-    if (this.isLoggedIn()) {
-      this.startIdleTimer();
-    }
+  /**
+   * Probe the server for the current session (via httpOnly cookie). Called
+   * once at bootstrap from APP_INITIALIZER.
+   */
+  bootstrap(): Observable<boolean> {
+    return this.http
+      .get<CurrentUser>(`${this.baseUrl}/auth/me`, { withCredentials: true })
+      .pipe(
+        timeout({ first: 5000 }),
+        tap(res => this.applySession(res)),
+        map(() => true),
+        catchError(() => {
+          this.clearSession();
+          return of(false);
+        }),
+        tap(() => this.ready.set(true))
+      );
   }
 
   hasPermission(perm: string): boolean {
     return this.authorities().includes('ROLE_SUPERADMIN') || this.authorities().includes(perm);
   }
 
-  login(credentials: any) {
-    return this.http.post<any>(`${this.baseUrl}/auth/login`, credentials).pipe(
-      map(res => {
-        if (res.token) {
-          localStorage.setItem('auth_token', res.token);
-          localStorage.setItem('user_authorities', JSON.stringify(res.authorities || []));
-          localStorage.setItem('current_user', JSON.stringify(res.user || null));
-          this.isLoggedIn.set(true);
-          this.authorities.set(res.authorities || []);
-          this.currentUser.set(res.user || null);
-          this.startIdleTimer();
+  hasRole(role: string): boolean {
+    return this.authorities().includes(`ROLE_${role}`);
+  }
+
+  login(credentials: { username: string; password: string }): Observable<CurrentUser> {
+    return this.http
+      .post<CurrentUser>(`${this.baseUrl}/auth/login`, credentials, { withCredentials: true })
+      .pipe(
+        tap(res => {
+          this.applySession(res);
           this.router.navigate(['/dashboard']);
-        }
-
-        return res;
-      }),
-      catchError(err => throwError(() => new Error('Invalid credentials')))
-    );
+        }),
+        catchError(() => throwError(() => new Error('Invalid credentials')))
+      );
   }
 
-  logout() {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_authorities');
-    localStorage.removeItem('current_user');
-    this.isLoggedIn.set(false);
-    this.authorities.set([]);
+  logout(redirectToLogin = true): void {
+    // Fire-and-forget; cookie is cleared regardless on server side.
+    this.http
+      .post<void>(`${this.baseUrl}/auth/logout`, {}, { withCredentials: true })
+      .pipe(catchError(() => of(null)))
+      .subscribe(() => {
+        this.clearSession();
+        if (redirectToLogin) this.router.navigate(['/login']);
+      });
+  }
+
+  private applySession(res: CurrentUser): void {
+    this.currentUser.set(res?.user ?? null);
+    this.authorities.set(res?.authorities ?? []);
+    this.isLoggedIn.set(!!res?.user);
+    if (res?.user) this.startIdleTimer();
+  }
+
+  private clearSession(): void {
     this.currentUser.set(null);
+    this.authorities.set([]);
+    this.isLoggedIn.set(false);
     this.stopIdleTimer();
-    this.router.navigate(['/login']);
   }
 
-
-  private startIdleTimer() {
+  private startIdleTimer(): void {
     this.stopIdleTimer();
-    // Default 30 mins if not found, usually fetched from config but simplified here for flow
-    const timeoutMins = 30; 
-    
+    const timeoutMins = 30;
     const resetTimer = () => {
-      clearTimeout(this.idleTimer);
+      if (this.idleTimer) clearTimeout(this.idleTimer);
       this.idleTimer = setTimeout(() => this.logout(), timeoutMins * 60 * 1000);
     };
 
-    ['mousedown', 'mousemove', 'keypress', 'touchstart'].forEach(evt => 
-      window.addEventListener(evt, resetTimer, true)
-    );
+    if (!this.idleListenersAttached) {
+      this.idleEvents.forEach(evt => window.addEventListener(evt, resetTimer, true));
+      this.idleListenersAttached = true;
+    }
     resetTimer();
   }
 
-  private stopIdleTimer() {
-    clearTimeout(this.idleTimer);
+  private stopIdleTimer(): void {
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = undefined;
+    }
   }
 }
-
