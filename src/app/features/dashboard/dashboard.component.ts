@@ -16,10 +16,10 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule } from 'lucide-angular';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { filter, interval, switchMap, take, takeUntil, timer } from 'rxjs';
+import { filter, interval, Subscription, switchMap, take, takeUntil, timer } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
-import { ScanResultSummary, ScheduleConfig } from '../../core/models';
+import { ScanResultSummary, ScannedArticle, ScheduleConfig } from '../../core/models';
 
 type ScanStatus = 'COMPLETED' | 'RUNNING' | 'UPCOMING';
 interface TimelineEntry {
@@ -82,13 +82,95 @@ const DOW_MAP: Record<string, number> = {
         </div>
       </div>
 
+      <!-- Insights row: sparkline trend + top sources -->
+      <div class="insights-grid mb-6">
+        <div class="card glass insights-card">
+          <div class="flex justify-between items-center mb-3">
+            <div class="flex gap-2 items-center">
+              <lucide-icon name="trending-up" size="18" class="primary-text"></lucide-icon>
+              <h3 class="section-title mb-0">Scan Duration Trend</h3>
+            </div>
+            <span class="muted text-xs">last {{ durationTrend().length }} scans</span>
+          </div>
+          @if (durationTrend().length >= 2) {
+            <svg [attr.viewBox]="'0 0 ' + sparklineWidth + ' ' + sparklineHeight" preserveAspectRatio="none" class="sparkline">
+              <defs>
+                <linearGradient [attr.id]="sparkGradientId" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="var(--primary-color)" stop-opacity="0.35"/>
+                  <stop offset="100%" stop-color="var(--primary-color)" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <path [attr.d]="sparklineAreaPath()" [attr.fill]="'url(#' + sparkGradientId + ')'" stroke="none"></path>
+              <polyline [attr.points]="sparklinePoints()" fill="none" stroke="var(--primary-color)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></polyline>
+              @for (p of sparklineDots(); track $index) {
+                <circle [attr.cx]="p.x" [attr.cy]="p.y" r="3" fill="var(--primary-color)">
+                  <title>{{ p.label }}</title>
+                </circle>
+              }
+            </svg>
+            <div class="trend-meta">
+              <div class="meta-item">
+                <span class="muted">avg</span>
+                <strong>{{ trendStats().avg | number:'1.0-0' }}ms</strong>
+              </div>
+              <div class="meta-item">
+                <span class="muted">peak</span>
+                <strong>{{ trendStats().peak | number:'1.0-0' }}ms</strong>
+              </div>
+              <div class="meta-item">
+                <span class="muted">change</span>
+                <strong [class.success-text]="trendStats().delta < 0" [class.danger-text]="trendStats().delta > 0">
+                  {{ trendStats().delta > 0 ? '+' : '' }}{{ trendStats().delta | number:'1.0-0' }}ms
+                </strong>
+              </div>
+            </div>
+          } @else {
+            <div class="empty-state muted">Waiting for more scans to chart…</div>
+          }
+        </div>
+
+        <div class="card glass insights-card">
+          <div class="flex justify-between items-center mb-3">
+            <div class="flex gap-2 items-center">
+              <lucide-icon name="bar-chart-3" size="18" class="primary-text"></lucide-icon>
+              <h3 class="section-title mb-0">Top Sources</h3>
+            </div>
+            <span class="muted text-xs">latest results</span>
+          </div>
+          @if (topSources().length === 0) {
+            <div class="empty-state muted">No articles captured yet.</div>
+          } @else {
+            <div class="top-sources">
+              @for (s of topSources(); track s.source) {
+                <div class="source-row">
+                  <div class="source-name" [title]="s.source">{{ s.source }}</div>
+                  <div class="source-bar">
+                    <div class="source-fill" [style.width.%]="(s.count / topSources()[0].count) * 100"></div>
+                  </div>
+                  <div class="source-count">{{ s.count }}</div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
       <div class="main-grid">
         <div class="card glass control-card">
           <div class="flex justify-between items-center mb-6">
             <h3 class="section-title">System Execution</h3>
-            <span class="badge" [class.badge-success]="isRunning()" [class.badge-danger]="!isRunning()">
-              {{ isRunning() ? 'OPTIMAL' : 'PAUSED' }}
-            </span>
+            <div class="flex gap-2 items-center">
+              <button class="auto-refresh-toggle"
+                      [class.on]="autoRefresh()"
+                      (click)="toggleAutoRefresh()"
+                      [title]="autoRefresh() ? 'Live refresh on (every 15s)' : 'Enable live refresh'">
+                <lucide-icon name="zap" size="14"></lucide-icon>
+                <span>{{ autoRefresh() ? 'LIVE' : 'PAUSED' }}</span>
+              </button>
+              <span class="badge" [class.badge-success]="isRunning()" [class.badge-danger]="!isRunning()">
+                {{ isRunning() ? 'OPTIMAL' : 'PAUSED' }}
+              </span>
+            </div>
           </div>
 
           <div class="control-actions mb-5">
@@ -204,6 +286,23 @@ const DOW_MAP: Record<string, number> = {
     .page-title { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.25rem; }
     .section-title { font-size: 1.1rem; font-weight: 600; margin: 0; }
     .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+    .insights-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.5rem; }
+    .insights-card { padding: 1.25rem 1.5rem; }
+    .sparkline { width: 100%; height: 80px; display: block; }
+    .trend-meta { display: flex; gap: 1.5rem; margin-top: 8px; font-size: 0.8rem; }
+    .meta-item { display: flex; flex-direction: column; gap: 2px; }
+    .meta-item strong { font-size: 0.95rem; color: var(--text-main); }
+    .empty-state { font-size: 0.85rem; text-align: center; padding: 1.5rem 0; }
+    .top-sources { display: flex; flex-direction: column; gap: 8px; }
+    .source-row { display: grid; grid-template-columns: 1fr 100px 32px; gap: 12px; align-items: center; font-size: 0.85rem; }
+    .source-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main); font-weight: 500; }
+    .source-bar { height: 8px; background: var(--surface-active); border-radius: 99px; overflow: hidden; }
+    .source-fill { height: 100%; background: linear-gradient(90deg, var(--primary-color), var(--primary-hover)); border-radius: 99px; transition: width 0.4s ease; }
+    .source-count { text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    .auto-refresh-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--border-strong); background: transparent; color: var(--text-muted); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; cursor: pointer; transition: var(--transition); }
+    .auto-refresh-toggle.on { background: rgba(var(--primary-rgb), 0.12); color: var(--primary-color); border-color: rgba(var(--primary-rgb), 0.3); box-shadow: 0 0 12px rgba(var(--primary-rgb), 0.25); }
+    .auto-refresh-toggle:hover { color: var(--text-main); }
+    .auto-refresh-toggle.on:hover { color: var(--primary-color); }
     .stat-header { display: flex; justify-content: space-between; align-items: flex-start; }
     .icon-wrap { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
     .primary-bg { background: linear-gradient(135deg, rgba(var(--primary-rgb),0.2), rgba(var(--primary-rgb),0.05)); border: 1px solid rgba(var(--primary-rgb),0.2); color: var(--primary-color); }
@@ -231,9 +330,9 @@ const DOW_MAP: Record<string, number> = {
     .tl-running { background: rgba(245,158,11,0.12); color: var(--warning-color); border-color: rgba(245,158,11,0.3); }
     .tl-upcoming { background: rgba(255,255,255,0.04); color: var(--text-muted); border-color: var(--border-strong); }
     .terminal-card { display: flex; flex-direction: column; padding: 0 !important; overflow: hidden; }
-    .terminal-header { padding: 16px 20px; border-bottom: 1px solid var(--border-light); background: rgba(0,0,0,0.3); }
-    .log-viewer { background: #0d1117; padding: 20px; overflow-y: auto; height: 480px; max-height: 480px; font-family: 'JetBrains Mono', monospace; display: block; }
-    .log-viewer pre { color: #8b949e; font-size: 0.85rem; margin: 0; white-space: pre-wrap; word-break: break-all; }
+    .terminal-header { padding: 16px 20px; border-bottom: 1px solid var(--border-light); background: var(--table-header-bg); }
+    .log-viewer { background: var(--log-bg); padding: 20px; overflow-y: auto; height: 480px; max-height: 480px; font-family: 'JetBrains Mono', monospace; display: block; }
+    .log-viewer pre { color: var(--log-fg); font-size: 0.85rem; margin: 0; white-space: pre-wrap; word-break: break-all; }
     .tab-btn { background: transparent; border: none; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); padding: 6px 12px; border-radius: var(--radius-sm); transition: var(--transition); }
     .tab-btn:hover { color: var(--text-main); background: rgba(255,255,255,0.05); }
     .tab-btn.active { background: rgba(var(--primary-rgb),0.15); color: var(--primary-color); }
@@ -245,8 +344,8 @@ const DOW_MAP: Record<string, number> = {
     .badge-mini { font-size: 0.6rem; padding: 1px 5px; border-radius: 4px; background: rgba(var(--primary-rgb),0.1); color: var(--primary-color); border: 1px solid rgba(var(--primary-rgb),0.2); }
     .badge-mini-manual { background: rgba(245,158,11,0.1); color: var(--warning-color); border-color: rgba(245,158,11,0.3); }
     .results-list { height: 100%; overflow-y: auto; }
-    .res-link { color: #58a6ff; text-decoration: none; transition: 0.2s; font-size: 0.9rem; }
-    .res-link:hover { color: #79c0ff; text-decoration: underline; }
+    .res-link { color: var(--link-color); text-decoration: none; transition: 0.2s; font-size: 0.9rem; }
+    .res-link:hover { color: var(--link-hover); text-decoration: underline; }
     .text-xs { font-size: 0.75rem; }
     .font-medium { font-weight: 500; }
     .spin { animation: spin 1s linear infinite; }
@@ -273,6 +372,71 @@ export class DashboardComponent implements OnInit, AfterViewChecked {
   lastDuration = computed(() => this.recentResults()[0]?.durationMs ?? 0);
   lastMatches = computed(() => this.recentResults()[0]?.newItemsCount ?? 0);
   todayEntries = signal<TimelineEntry[]>([]);
+
+  // ---- Auto-refresh ----
+  autoRefresh = signal(false);
+  private autoRefreshSub?: Subscription;
+  private readonly AUTO_REFRESH_MS = 15_000;
+
+  // ---- Sparkline ----
+  readonly sparklineWidth = 320;
+  readonly sparklineHeight = 80;
+  readonly sparkGradientId = 'spark-grad-' + Math.random().toString(36).slice(2, 8);
+
+  /** Most-recent N durations in chronological order (oldest -> newest). */
+  durationTrend = computed<number[]>(() =>
+    [...this.recentResults()]
+      .reverse()
+      .map(r => r.durationMs ?? 0)
+      .filter(v => v > 0)
+  );
+
+  private sparkPoints = computed<{ x: number; y: number; label: string }[]>(() => {
+    const values = this.durationTrend();
+    if (values.length < 2) return [];
+    const max = Math.max(...values);
+    const min = Math.min(...values);
+    const range = Math.max(1, max - min);
+    const stepX = this.sparklineWidth / (values.length - 1);
+    const padY = 6;
+    const usableH = this.sparklineHeight - padY * 2;
+    return values.map((v, i) => ({
+      x: +(i * stepX).toFixed(1),
+      y: +(padY + usableH - ((v - min) / range) * usableH).toFixed(1),
+      label: v + 'ms',
+    }));
+  });
+
+  sparklinePoints = computed(() => this.sparkPoints().map(p => `${p.x},${p.y}`).join(' '));
+  sparklineDots = computed(() => this.sparkPoints());
+  sparklineAreaPath = computed(() => {
+    const pts = this.sparkPoints();
+    if (pts.length < 2) return '';
+    const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+    return `${path} L ${pts[pts.length - 1].x} ${this.sparklineHeight} L ${pts[0].x} ${this.sparklineHeight} Z`;
+  });
+
+  trendStats = computed(() => {
+    const values = this.durationTrend();
+    if (values.length === 0) return { avg: 0, peak: 0, delta: 0 };
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    const peak = Math.max(...values);
+    const delta = values.length >= 2 ? values[values.length - 1] - values[values.length - 2] : 0;
+    return { avg, peak, delta };
+  });
+
+  // ---- Top sources from latest results ----
+  topSources = computed<{ source: string; count: number }[]>(() => {
+    const counts = new Map<string, number>();
+    for (const a of this.api.latestResults() as ScannedArticle[]) {
+      if (!a.source) continue;
+      counts.set(a.source, (counts.get(a.source) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([source, count]) => ({ source, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  });
 
   /** Set whenever logContent / activeLog changes so we scroll on the next view check, then reset. */
   private pendingScrollToBottom = false;
@@ -369,6 +533,22 @@ export class DashboardComponent implements OnInit, AfterViewChecked {
     (next ? this.api.pauseJobs() : this.api.resumeJobs())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({ error: err => console.error('togglePause failed', err) });
+  }
+
+  toggleAutoRefresh(): void {
+    const next = !this.autoRefresh();
+    this.autoRefresh.set(next);
+    if (next) {
+      this.autoRefreshSub = interval(this.AUTO_REFRESH_MS)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe(() => {
+          this.api.loadStats();
+          this.api.loadLatestResults();
+        });
+    } else {
+      this.autoRefreshSub?.unsubscribe();
+      this.autoRefreshSub = undefined;
+    }
   }
 
   triggerNow(): void {

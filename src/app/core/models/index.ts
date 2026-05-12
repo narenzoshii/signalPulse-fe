@@ -111,9 +111,17 @@ export interface UserRequest {
   roleIds: number[];
 }
 
+export interface SessionInfo {
+  /** Idle timeout in minutes — server-controlled (SESSION_TIMEOUT_MINS config). */
+  idleTimeoutMins: number;
+  /** Absolute lifetime of the JWT cookie in ms (informational; backend sliding-refreshes it). */
+  absoluteExpiryMs: number;
+}
+
 export interface CurrentUser {
   user: { username: string; roles: Array<{ name: string }> };
   authorities: string[];
+  session?: SessionInfo;
 }
 
 export interface ScanResultSummary {

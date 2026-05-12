@@ -36,9 +36,12 @@ export const appInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(modified).pipe(
     catchError((error: HttpErrorResponse) => {
-      // Don't loop: don't logout on the /auth/me probe itself
+      // Only force logout on 401 (token missing / invalid). 403 means
+      // the user is authenticated but lacks a specific permission — surfacing
+      // the error is the right response; logging the user out would mask the
+      // real cause and cascade across every in-flight request.
       const isAuthProbe = req.url.endsWith('/auth/me') || req.url.endsWith('/auth/login');
-      if (!isAuthProbe && (error.status === 401 || error.status === 403)) {
+      if (!isAuthProbe && error.status === 401) {
         authService.logout();
       }
       return throwError(() => error);

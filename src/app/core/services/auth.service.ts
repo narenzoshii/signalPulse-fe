@@ -1,34 +1,34 @@
-import { Injectable, signal, inject } from '@angular/core';
+import { Injectable, signal, inject, DestroyRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, map, of, tap, throwError, timeout } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { CurrentUser } from '../models';
+import { CurrentUser, SessionInfo } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   public isLoggedIn = signal<boolean>(false);
   public authorities = signal<string[]>([]);
   public currentUser = signal<CurrentUser['user'] | null>(null);
+  public sessionInfo = signal<SessionInfo | null>(null);
 
   /** Resolves true once the initial /me probe has settled, so guards can wait. */
   public ready = signal<boolean>(false);
 
   private http = inject(HttpClient);
   private router = inject(Router);
+  private destroyRef = inject(DestroyRef);
   private baseUrl =
     (environment.ADMIN_ENDPOINT.endsWith('/')
       ? environment.ADMIN_ENDPOINT
       : environment.ADMIN_ENDPOINT + '/') + 'api/v1';
 
   private idleTimer: ReturnType<typeof setTimeout> | undefined;
-  private idleListenersAttached = false;
   private readonly idleEvents = ['mousedown', 'mousemove', 'keypress', 'touchstart'] as const;
+  private idleListener?: () => void;
+  private visibilityListener?: () => void;
+  private lastVisibilityProbe = 0;
 
-  /**
-   * Probe the server for the current session (via httpOnly cookie). Called
-   * once at bootstrap from APP_INITIALIZER.
-   */
   bootstrap(): Observable<boolean> {
     return this.http
       .get<CurrentUser>(`${this.baseUrl}/auth/me`, { withCredentials: true })
@@ -65,7 +65,6 @@ export class AuthService {
   }
 
   logout(redirectToLogin = true): void {
-    // Fire-and-forget; cookie is cleared regardless on server side.
     this.http
       .post<void>(`${this.baseUrl}/auth/logout`, {}, { withCredentials: true })
       .pipe(catchError(() => of(null)))
@@ -75,31 +74,47 @@ export class AuthService {
       });
   }
 
+  /** Cheap probe — server returns 401 if cookie expired; interceptor will clear state. */
+  refreshSession(): void {
+    this.http.get<CurrentUser>(`${this.baseUrl}/auth/me`, { withCredentials: true })
+      .pipe(catchError(() => of(null)))
+      .subscribe(res => {
+        if (res) this.applySession(res);
+        else if (this.isLoggedIn()) this.clearSession();
+      });
+  }
+
   private applySession(res: CurrentUser): void {
     this.currentUser.set(res?.user ?? null);
     this.authorities.set(res?.authorities ?? []);
+    this.sessionInfo.set(res?.session ?? null);
     this.isLoggedIn.set(!!res?.user);
-    if (res?.user) this.startIdleTimer();
+    if (res?.user) {
+      this.startIdleTimer();
+      this.attachVisibilityListener();
+    }
   }
 
   private clearSession(): void {
     this.currentUser.set(null);
     this.authorities.set([]);
+    this.sessionInfo.set(null);
     this.isLoggedIn.set(false);
     this.stopIdleTimer();
+    this.detachVisibilityListener();
   }
 
   private startIdleTimer(): void {
     this.stopIdleTimer();
-    const timeoutMins = 30;
+    const timeoutMins = this.sessionInfo()?.idleTimeoutMins ?? 30;
     const resetTimer = () => {
       if (this.idleTimer) clearTimeout(this.idleTimer);
       this.idleTimer = setTimeout(() => this.logout(), timeoutMins * 60 * 1000);
     };
 
-    if (!this.idleListenersAttached) {
-      this.idleEvents.forEach(evt => window.addEventListener(evt, resetTimer, true));
-      this.idleListenersAttached = true;
+    if (!this.idleListener) {
+      this.idleListener = resetTimer;
+      this.idleEvents.forEach(evt => window.addEventListener(evt, this.idleListener!, true));
     }
     resetTimer();
   }
@@ -108,6 +123,30 @@ export class AuthService {
     if (this.idleTimer) {
       clearTimeout(this.idleTimer);
       this.idleTimer = undefined;
+    }
+    if (this.idleListener) {
+      this.idleEvents.forEach(evt => window.removeEventListener(evt, this.idleListener!, true));
+      this.idleListener = undefined;
+    }
+  }
+
+  private attachVisibilityListener(): void {
+    if (this.visibilityListener) return;
+    this.visibilityListener = () => {
+      if (document.visibilityState !== 'visible') return;
+      // Debounce: don't probe more than once every 10s.
+      const now = Date.now();
+      if (now - this.lastVisibilityProbe < 10_000) return;
+      this.lastVisibilityProbe = now;
+      this.refreshSession();
+    };
+    document.addEventListener('visibilitychange', this.visibilityListener);
+  }
+
+  private detachVisibilityListener(): void {
+    if (this.visibilityListener) {
+      document.removeEventListener('visibilitychange', this.visibilityListener);
+      this.visibilityListener = undefined;
     }
   }
 }

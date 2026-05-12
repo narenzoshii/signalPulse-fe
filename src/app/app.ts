@@ -3,6 +3,7 @@ import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { LucideAngularModule } from 'lucide-angular';
 import { CommonModule } from '@angular/common';
 import { AuthService } from './core/services/auth.service';
+import { ThemeService } from './core/services/theme.service';
 
 @Component({
   selector: 'app-root',
@@ -64,6 +65,11 @@ import { AuthService } from './core/services/auth.service';
             <div class="breadcrumb">
               <span class="muted">Signal Pulse</span> <span class="muted mx-2">/</span> <span class="current-route">Console</span>
             </div>
+            <div class="header-actions">
+              <button class="icon-btn theme-btn" (click)="theme.toggle()" [title]="theme.theme() === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'" aria-label="Toggle theme">
+                <lucide-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" size="18"></lucide-icon>
+              </button>
+            </div>
           </header>
           <div class="page-container">
             <router-outlet></router-outlet>
@@ -78,7 +84,7 @@ import { AuthService } from './core/services/auth.service';
     .app-layout { display: flex; height: 100vh; overflow: hidden; background-color: var(--bg-color); }
     .sidebar { width: var(--sidebar-width); background-color: var(--surface-base); border-right: 1px solid var(--border-light); display: flex; flex-direction: column; z-index: 10; }
     .brand { height: var(--header-height); display: flex; align-items: center; padding: 0 24px; border-bottom: 1px solid var(--border-light); gap: 12px; }
-    .logo-img { width: 44px; height: 44px; object-fit: contain; padding: 6px; background-color: #1e293b; border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,0.3); }
+    .logo-img { width: 44px; height: 44px; object-fit: contain; padding: 6px; background-color: var(--surface-hover); border-radius: 8px; box-shadow: var(--shadow-sm); }
     .brand-text h2 { font-size: 1rem; margin: 0; color: var(--text-main); }
     .brand-text span { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
     .nav-menu { flex: 1; padding: 24px 16px; overflow-y: auto; }
@@ -96,7 +102,9 @@ import { AuthService } from './core/services/auth.service';
     .logout-icon { color: var(--text-darkest); }
     .user-profile:hover .logout-icon { color: var(--danger-color); }
     .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-    .top-header { height: var(--header-height); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid var(--border-light); background-color: rgba(11, 15, 25, 0.8); backdrop-filter: blur(8px); z-index: 5; }
+    .top-header { height: var(--header-height); display: flex; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid var(--border-light); background-color: var(--card-glass-bg); backdrop-filter: blur(8px); z-index: 5; }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .theme-btn { width: 36px; height: 36px; justify-content: center; }
     .breadcrumb { font-size: 0.9rem; font-weight: 500; }
     .current-route { color: var(--text-main); }
     .mx-2 { margin: 0 0.5rem; }
@@ -105,6 +113,7 @@ import { AuthService } from './core/services/auth.service';
 })
 export class AppComponent {
   authService = inject(AuthService);
+  theme = inject(ThemeService);
 
   initials = computed(() => {
     const name = this.authService.currentUser()?.username ?? '';

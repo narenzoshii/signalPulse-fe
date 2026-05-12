@@ -16,7 +16,7 @@ import {
   LayoutDashboard, Calendar, Settings, Database, Activity, RefreshCw, Play, Pause, PlayCircle,
   PauseCircle, Trash2, Edit3, Globe, Plus, LogOut, Mail, Sliders, Save, Server, ShieldCheck,
   Route, Layers, ArrowRightCircle, Check, Hash, Rss, X, Clock, Link2, Cog, User, Shield,
-  RotateCw, UserCog, ShieldUser,
+  RotateCw, UserCog, ShieldUser, Sun, Moon, BarChart3, TrendingUp, Zap,
 } from 'lucide-angular';
 
 export const appConfig: ApplicationConfig = {
@@ -37,6 +37,7 @@ export const appConfig: ApplicationConfig = {
         PlayCircle, PauseCircle, Trash2, Edit3, Globe, Plus, LogOut, Mail, Sliders, Save,
         Server, ShieldCheck, Route, Layers, ArrowRightCircle, Check, Hash, Rss, X, Clock,
         Link2, Cog, User, Shield, RotateCw, UserCog, ShieldUser,
+        Sun, Moon, BarChart3, TrendingUp, Zap,
       })
     ),
   ],

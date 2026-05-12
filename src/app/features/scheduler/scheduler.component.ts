@@ -122,7 +122,7 @@ import { ScheduleConfig } from '../../core/models';
     .cursor-pointer { cursor: pointer; }
     .hover-danger:hover { color: var(--danger-color); }
     .day-pills { display: flex; flex-wrap: wrap; gap: 6px; }
-    .day-pill { background: rgba(0,0,0,0.3); border: 1px solid var(--border-strong); color: var(--text-muted); font-size: 0.75rem; font-weight: 600; padding: 6px 12px; border-radius: 99px; transition: var(--transition); }
+    .day-pill { background: var(--surface-hover); border: 1px solid var(--border-strong); color: var(--text-muted); font-size: 0.75rem; font-weight: 600; padding: 6px 12px; border-radius: 99px; transition: var(--transition); }
     .day-pill:hover { border-color: var(--primary-color); color: var(--text-main); }
     .day-pill.active { background: var(--primary-color); border-color: var(--primary-color); color: white; box-shadow: 0 2px 8px rgba(var(--primary-rgb), 0.4); }
     .schedule-card { transition: var(--transition); border-left: 3px solid var(--primary-color); }

@@ -387,17 +387,17 @@ type Tab = 'rss' | 'html' | 'topics' | 'categories';
     .main-card { min-height: 400px; padding: 2rem; }
     .toggle-btn { position: relative; width: 36px; height: 20px; border-radius: 99px; border: none; padding: 0; background: var(--border-strong); cursor: pointer; transition: background 0.25s; flex-shrink: 0; }
     .toggle-btn.toggle-on { background: var(--success-color); }
-    .toggle-knob { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: white; transition: left 0.25s; box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
+    .toggle-knob { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: white; transition: left 0.25s; box-shadow: 0 1px 4px var(--code-bg); }
     .toggle-btn.toggle-on .toggle-knob { left: 19px; }
     .status-group { display: flex; flex-direction: column; justify-content: flex-end; }
     .status-label { font-size: 0.85rem; color: var(--text-muted); }
     .active-label { color: var(--success-color); }
-    .bg-none { background: rgba(0,0,0,0.3) !important; color: var(--text-main) !important; border-color: var(--border-strong) !important; }
+    .bg-none { background: var(--code-bg) !important; color: var(--text-main) !important; border-color: var(--border-strong) !important; }
     .font-medium { font-weight: 500; }
     .text-sm { font-size: 0.85rem; }
     .primary-text { color: var(--primary-color); }
     .mr-1 { margin-right: 4px; }
-    code { font-family: 'JetBrains Mono', monospace; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border-strong); color: var(--text-main); }
+    code { font-family: 'JetBrains Mono', monospace; background: var(--code-bg); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border-strong); color: var(--text-main); }
     .url-cell { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .py-6 { padding-top: 2rem !important; padding-bottom: 2rem !important; }
     .text-right { text-align: right; }
