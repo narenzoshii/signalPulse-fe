@@ -11,6 +11,7 @@ import {
   Feed,
   FeedRequest,
   HtmlPage,
+  HtmlPagePreview,
   HtmlPageRequest,
   TopicRule,
 } from '../../core/models';
@@ -57,7 +58,7 @@ type Tab = 'rss' | 'html' | 'topics' | 'categories';
           <div class="table-container">
             <table>
               <thead><tr>
-                <th>Status</th><th>Name</th><th>Category</th><th>URL</th><th>Trust</th><th class="text-right">Actions</th>
+                <th>Status</th><th>Name</th><th>Category</th><th>URL</th><th>Trust</th><th>Health</th><th class="text-right">Actions</th>
               </tr></thead>
               <tbody>
                 @for (feed of api.feeds(); track feed.id) {
@@ -71,6 +72,14 @@ type Tab = 'rss' | 'html' | 'topics' | 'categories';
                     <td><span class="badge badge-neutral bg-none">{{ feed.category?.name || 'Uncategorized' }}</span></td>
                     <td class="muted text-sm url-cell" [title]="feed.url">{{ feed.url }}</td>
                     <td><span class="badge badge-neutral bg-none">{{ feed.trust | number:'1.2-2' }}</span></td>
+                    <td>
+                      <div class="health-cell" [title]="healthTooltip(feed)">
+                        <span class="health-badge" [ngClass]="healthClass(feed)">{{ healthLabel(feed) }}</span>
+                        @if (feed.lastScanAt) {
+                          <div class="health-meta muted">{{ feed.lastScanAt | date:'MMM d, HH:mm' }}<span *ngIf="feed.lastArticleCount"> · {{ feed.lastArticleCount }} found</span></div>
+                        }
+                      </div>
+                    </td>
                     <td class="text-right">
                       <button *ngIf="auth.hasPermission('OP_WRITE_SOURCES')" class="icon-btn mr-1" (click)="openEdit('rss', feed)"><lucide-icon name="edit-3" size="16"></lucide-icon></button>
                       <button *ngIf="auth.hasPermission('OP_WRITE_SOURCES')" class="icon-btn danger" (click)="confirmDelete('rss', feed)"><lucide-icon name="trash-2" size="16"></lucide-icon></button>
@@ -78,7 +87,7 @@ type Tab = 'rss' | 'html' | 'topics' | 'categories';
                   </tr>
                 }
                 @if (api.feeds().length === 0) {
-                  <tr><td colspan="6" class="text-center py-6 muted">No feeds configured yet.</td></tr>
+                  <tr><td colspan="7" class="text-center py-6 muted">No feeds configured yet.</td></tr>
                 }
               </tbody>
             </table>
@@ -95,7 +104,7 @@ type Tab = 'rss' | 'html' | 'topics' | 'categories';
           <div class="table-container">
             <table>
               <thead><tr>
-                <th>Status</th><th>Name</th><th>Category</th><th>URL</th><th>Type</th><th>Selectors</th><th>Trust</th><th class="text-right">Actions</th>
+                <th>Status</th><th>Name</th><th>Category</th><th>URL</th><th>Mode</th><th>Trust</th><th>Health</th><th class="text-right">Actions</th>
               </tr></thead>
               <tbody>
                 @for (page of api.pages(); track page.id) {
@@ -108,12 +117,16 @@ type Tab = 'rss' | 'html' | 'topics' | 'categories';
                     <td class="font-medium">{{ page.name }}</td>
                     <td><span class="badge badge-neutral bg-none">{{ page.category?.name || 'Uncategorized' }}</span></td>
                     <td class="muted text-sm url-cell" [title]="page.url">{{ page.url }}</td>
-                    <td><span class="badge badge-neutral bg-none" style="font-size:0.7rem;">{{ page.type || 'html_list' }}</span></td>
-                    <td class="text-sm">
-                      <div class="muted">List: <code>{{ page.listSelector }}</code></div>
-                      <div class="muted">Link: <code>{{ page.linkSelector || 'N/A' }}</code></div>
-                    </td>
+                    <td><span class="badge badge-neutral bg-none" style="font-size:0.7rem;">{{ page.discoveryMode || 'auto' }}</span></td>
                     <td><span class="badge badge-neutral bg-none">{{ page.trust | number:'1.2-2' }}</span></td>
+                    <td>
+                      <div class="health-cell" [title]="healthTooltip(page)">
+                        <span class="health-badge" [ngClass]="healthClass(page)">{{ healthLabel(page) }}</span>
+                        @if (page.lastScanAt) {
+                          <div class="health-meta muted">{{ page.lastScanAt | date:'MMM d, HH:mm' }}<span *ngIf="page.lastArticleCount"> · {{ page.lastArticleCount }} found</span></div>
+                        }
+                      </div>
+                    </td>
                     <td class="text-right">
                       <button *ngIf="auth.hasPermission('OP_WRITE_SOURCES')" class="icon-btn mr-1" (click)="openEdit('html', page)"><lucide-icon name="edit-3" size="16"></lucide-icon></button>
                       <button *ngIf="auth.hasPermission('OP_WRITE_SOURCES')" class="icon-btn danger" (click)="confirmDelete('html', page)"><lucide-icon name="trash-2" size="16"></lucide-icon></button>
@@ -250,67 +263,119 @@ type Tab = 'rss' | 'html' | 'topics' | 'categories';
             }
 
             @if (activeTabMode === 'html') {
-              <div class="grid-2">
-                <div class="form-group">
-                  <label>Page Name</label>
-                  <input class="input" [(ngModel)]="formData.name" placeholder="e.g. Acme Corp Blog">
-                </div>
-                <div class="form-group">
-                  <label>Page Type</label>
-                  <select class="input" [(ngModel)]="formData.type">
-                    <option value="html_list">html_list</option>
-                    <option value="html_detail">html_detail</option>
-                  </select>
-                </div>
+              <div class="form-group">
+                <label>Page Name</label>
+                <input class="input" [(ngModel)]="formData.name" placeholder="e.g. AltFi News">
               </div>
               <div class="form-group">
                 <label>Target URL</label>
-                <input class="input" [(ngModel)]="formData.url" placeholder="https://...">
+                <div class="flex gap-2">
+                  <input class="input flex-1" [(ngModel)]="formData.url" placeholder="https://...">
+                  <button type="button" class="btn-secondary" (click)="runPreview()" [disabled]="previewing()">
+                    {{ previewing() ? 'Testing…' : 'Test Source' }}
+                  </button>
+                </div>
               </div>
-              <div class="form-group">
-                <label>Category</label>
-                <select class="input" [(ngModel)]="selectedCategoryId">
-                  <option [ngValue]="null">Uncategorized</option>
-                  @for (cat of api.categories(); track cat.id) {
-                    <option [ngValue]="cat.id">{{ cat.name }}</option>
-                  }
-                </select>
-              </div>
+
               <div class="grid-2">
                 <div class="form-group">
-                  <label>List Selector (CSS)</label>
-                  <input class="input" [(ngModel)]="formData.listSelector" placeholder=".article-item">
+                  <label>Category</label>
+                  <select class="input" [(ngModel)]="selectedCategoryId">
+                    <option [ngValue]="null">Uncategorized</option>
+                    @for (cat of api.categories(); track cat.id) {
+                      <option [ngValue]="cat.id">{{ cat.name }}</option>
+                    }
+                  </select>
                 </div>
-                <div class="form-group">
-                  <label>Title Selector</label>
-                  <input class="input" [(ngModel)]="formData.titleSelector" placeholder="h2.title">
-                </div>
-              </div>
-              <div class="grid-2">
-                <div class="form-group">
-                  <label>Link Selector</label>
-                  <input class="input" [(ngModel)]="formData.linkSelector" placeholder="a.read-more">
-                </div>
-                <div class="form-group">
-                  <label>Date Selector <span class="hint-inline">CSS / format string</span></label>
-                  <input class="input" [(ngModel)]="formData.dateSelector" placeholder=".post-date">
-                </div>
-              </div>
-              <div class="grid-2">
                 <div class="form-group">
                   <label>Base Trust Weight</label>
                   <input type="number" class="input" [(ngModel)]="formData.trust" step="0.1" min="0" max="10">
                 </div>
-                <div class="form-group status-group">
-                  <label>Status</label>
-                  <div class="flex items-center gap-3">
-                    <button class="toggle-btn" [class.toggle-on]="formData.enabled" (click)="formData.enabled = !formData.enabled">
-                      <span class="toggle-knob"></span>
-                    </button>
-                    <span class="status-label" [class.active-label]="formData.enabled">{{ formData.enabled ? 'Active' : 'Disabled' }}</span>
-                  </div>
+              </div>
+
+              <div class="form-group status-group">
+                <label>Status</label>
+                <div class="flex items-center gap-3">
+                  <button type="button" class="toggle-btn" [class.toggle-on]="formData.enabled" (click)="formData.enabled = !formData.enabled">
+                    <span class="toggle-knob"></span>
+                  </button>
+                  <span class="status-label" [class.active-label]="formData.enabled">{{ formData.enabled ? 'Active' : 'Disabled' }}</span>
                 </div>
               </div>
+
+              <!-- Preview output -->
+              @if (previewResult()) {
+                @if ((previewResult()!.rssLinks?.length ?? 0) > 0) {
+                  <div class="rss-suggestion">
+                    <strong>💡 This site publishes an RSS feed.</strong>
+                    <p class="text-xs mt-1 muted">RSS scrapes are far more reliable than HTML scraping — consider adding the feed below under the <em>RSS Feeds</em> tab instead.</p>
+                    @for (r of previewResult()!.rssLinks!; track r.url) {
+                      <div class="rss-link">
+                        <code>{{ r.url }}</code>
+                        <button type="button" class="copy-btn" (click)="copyToClipboard(r.url)">Copy</button>
+                      </div>
+                    }
+                  </div>
+                }
+                <div class="preview-panel">
+                  <div class="flex justify-between items-center mb-2">
+                    <strong>Preview <span class="muted">({{ previewResult()!.mode }})</span></strong>
+                    <span class="muted text-xs">{{ previewResult()!.totalFound }} candidates found</span>
+                  </div>
+                  @if (previewResult()!.items.length === 0) {
+                    <div class="muted text-sm">No articles detected. Try Advanced mode and supply selectors.</div>
+                  } @else {
+                    <ul class="preview-list">
+                      @for (it of previewResult()!.items; track it.link) {
+                        <li>
+                          <a [href]="it.link" target="_blank" rel="noopener noreferrer">{{ it.title || it.link }}</a>
+                        </li>
+                      }
+                    </ul>
+                  }
+                </div>
+              }
+              @if (previewError()) {
+                <div class="alert alert-danger mt-2">{{ previewError() }}</div>
+              }
+
+              <!-- Advanced toggle -->
+              <button type="button" class="advanced-toggle mt-4" (click)="showAdvanced.set(!showAdvanced())">
+                <span>{{ showAdvanced() ? '▼' : '▶' }}</span>
+                Advanced — manual CSS selectors
+              </button>
+              @if (showAdvanced()) {
+                <div class="advanced-panel">
+                  <p class="muted text-xs mb-3">Auto-detect normally finds articles on its own. Use these if you need to point the scanner at a specific section of the page.</p>
+                  <div class="form-group">
+                    <label>Discovery Mode</label>
+                    <select class="input" [(ngModel)]="formData.discoveryMode">
+                      <option value="auto">Auto (recommended)</option>
+                      <option value="manual">Manual CSS selectors</option>
+                    </select>
+                  </div>
+                  @if (formData.discoveryMode === 'manual') {
+                    <div class="grid-2">
+                      <div class="form-group">
+                        <label>List Selector <span class="hint-inline">required</span></label>
+                        <input class="input" [(ngModel)]="formData.listSelector" placeholder=".article-item">
+                      </div>
+                      <div class="form-group">
+                        <label>Title Selector</label>
+                        <input class="input" [(ngModel)]="formData.titleSelector" placeholder="h2.title">
+                      </div>
+                      <div class="form-group">
+                        <label>Link Selector</label>
+                        <input class="input" [(ngModel)]="formData.linkSelector" placeholder="a.read-more">
+                      </div>
+                      <div class="form-group">
+                        <label>Date Selector <span class="hint-inline">optional</span></label>
+                        <input class="input" [(ngModel)]="formData.dateSelector" placeholder=".post-date">
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
             }
 
             @if (activeTabMode === 'topics') {
@@ -414,6 +479,29 @@ type Tab = 'rss' | 'html' | 'topics' | 'categories';
     .hint-inline { font-size: 0.7rem; color: var(--text-darkest); font-weight: 400; margin-left: 4px; }
     .field-hint { font-size: 0.75rem; color: var(--text-darkest); margin-top: 4px; display: block; }
     .alert-danger { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); padding: 10px; border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 0.85rem; }
+    .health-cell { display: flex; flex-direction: column; gap: 2px; min-width: 110px; }
+    .health-badge { display: inline-block; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.05em; padding: 2px 7px; border-radius: 99px; border: 1px solid; text-transform: uppercase; }
+    .health-badge.h-ok { background: rgba(16, 185, 129, 0.12); color: var(--success-color); border-color: rgba(16, 185, 129, 0.3); }
+    .health-badge.h-warn { background: rgba(245, 158, 11, 0.12); color: var(--warning-color); border-color: rgba(245, 158, 11, 0.3); }
+    .health-badge.h-bad { background: rgba(239, 68, 68, 0.12); color: var(--danger-color); border-color: rgba(239, 68, 68, 0.3); }
+    .health-badge.h-idle { background: var(--surface-active); color: var(--text-muted); border-color: var(--border-strong); }
+    .health-meta { font-size: 0.7rem; line-height: 1.2; }
+    .flex-1 { flex: 1; }
+    .rss-suggestion { margin-top: 12px; padding: 12px 14px; background: rgba(var(--primary-rgb), 0.06); border: 1px solid rgba(var(--primary-rgb), 0.2); border-radius: var(--radius-sm); }
+    .rss-link { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .rss-link code { flex: 1; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; }
+    .copy-btn { background: var(--surface-active); border: 1px solid var(--border-strong); color: var(--text-main); padding: 3px 10px; border-radius: var(--radius-sm); font-size: 0.75rem; }
+    .copy-btn:hover { background: var(--surface-hover); }
+    .preview-panel { margin-top: 12px; padding: 12px 14px; background: var(--surface-hover); border: 1px solid var(--border-light); border-radius: var(--radius-sm); }
+    .preview-list { list-style: none; padding: 0; margin: 0; max-height: 220px; overflow-y: auto; }
+    .preview-list li { padding: 6px 0; border-bottom: 1px solid var(--border-light); font-size: 0.85rem; }
+    .preview-list li:last-child { border-bottom: none; }
+    .preview-list a { color: var(--link-color); text-decoration: none; }
+    .preview-list a:hover { text-decoration: underline; }
+    .advanced-toggle { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85rem; font-weight: 600; padding: 6px 0; display: flex; align-items: center; gap: 6px; }
+    .advanced-toggle:hover { color: var(--text-main); }
+    .advanced-panel { margin-top: 8px; padding: 14px; background: var(--surface-hover); border: 1px solid var(--border-light); border-radius: var(--radius-sm); }
+    .text-xs { font-size: 0.75rem; }
   `]
 })
 export class SourcesComponent implements OnInit {
@@ -426,6 +514,12 @@ export class SourcesComponent implements OnInit {
   showModal = signal(false);
   saving = signal(false);
   saveError = signal<string | null>(null);
+
+  // HTML auto-discovery test panel
+  showAdvanced = signal(false);
+  previewing = signal(false);
+  previewResult = signal<HtmlPagePreview | null>(null);
+  previewError = signal<string | null>(null);
   editingItem: Feed | HtmlPage | TopicRule | Category | null = null;
   activeTabMode: Tab = 'rss';
   // The form is intentionally loose-typed (it switches shape per tab).
@@ -462,6 +556,11 @@ export class SourcesComponent implements OnInit {
     } else {
       this.patternsInput = '';
     }
+    // Reset preview state, and open advanced if this page is in manual mode.
+    this.previewResult.set(null);
+    this.previewError.set(null);
+    this.showAdvanced.set(tab === 'html' && (item as HtmlPage).discoveryMode === 'manual');
+    if (tab === 'html' && !this.formData.discoveryMode) this.formData.discoveryMode = 'auto';
     this.showModal.set(true);
   }
 
@@ -471,7 +570,14 @@ export class SourcesComponent implements OnInit {
     if (this.activeTabMode === 'rss') {
       this.formData = { name: '', url: '', description: '', trust: 1.0, enabled: true };
     } else if (this.activeTabMode === 'html') {
-      this.formData = { name: '', url: '', description: '', trust: 1.0, enabled: true, type: 'html_list', listSelector: '', titleSelector: '', linkSelector: '', dateSelector: '' };
+      this.formData = {
+        name: '', url: '', description: '', trust: 1.0, enabled: true,
+        type: 'html_list', discoveryMode: 'auto',
+        listSelector: '', titleSelector: '', linkSelector: '', dateSelector: '',
+      };
+      this.previewResult.set(null);
+      this.previewError.set(null);
+      this.showAdvanced.set(false);
     } else if (this.activeTabMode === 'categories') {
       this.formData = { name: '', description: '', weight: 1.0 };
     } else {
@@ -486,6 +592,59 @@ export class SourcesComponent implements OnInit {
       case 'categories': return 'Category';
       default: return 'Topic Rule';
     }
+  }
+
+  /** Source health summary: idle (never scanned), ok, warn (some failures), bad (auto-disabled threshold). */
+  healthLabel(s: { lastScanStatus?: string; consecutiveFailures?: number; enabled?: boolean }): string {
+    if (!s.lastScanStatus) return 'IDLE';
+    if (s.lastScanStatus === 'SUCCESS') return 'OK';
+    const failures = s.consecutiveFailures ?? 0;
+    if (!s.enabled && failures >= 10) return 'DISABLED';
+    return `FAILING (${failures})`;
+  }
+
+  healthClass(s: { lastScanStatus?: string; consecutiveFailures?: number; enabled?: boolean }): string {
+    if (!s.lastScanStatus) return 'h-idle';
+    if (s.lastScanStatus === 'SUCCESS') return 'h-ok';
+    const failures = s.consecutiveFailures ?? 0;
+    if (!s.enabled && failures >= 10) return 'h-bad';
+    return failures >= 3 ? 'h-bad' : 'h-warn';
+  }
+
+  healthTooltip(s: { lastScanError?: string; lastScanAt?: string; consecutiveFailures?: number }): string {
+    if (!s.lastScanError) return s.lastScanAt ? `Last scan: ${s.lastScanAt}` : 'Never scanned';
+    return `Last error: ${s.lastScanError}\nConsecutive failures: ${s.consecutiveFailures ?? 0}`;
+  }
+
+  copyToClipboard(text: string): void {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).catch(err => console.warn('Clipboard write failed', err));
+    }
+  }
+
+  runPreview(): void {
+    if (!this.validateUrl(this.formData.url)) {
+      this.previewError.set('Enter a valid http(s) URL first.');
+      this.previewResult.set(null);
+      return;
+    }
+    this.previewing.set(true);
+    this.previewError.set(null);
+    this.previewResult.set(null);
+    const mode = (this.formData.discoveryMode as 'auto' | 'manual') || 'auto';
+    this.api.previewPage({
+      url: this.formData.url,
+      discoveryMode: mode,
+      listSelector: this.formData.listSelector,
+      titleSelector: this.formData.titleSelector,
+      linkSelector: this.formData.linkSelector,
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: r => { this.previewResult.set(r); this.previewing.set(false); },
+      error: err => {
+        this.previewing.set(false);
+        this.previewError.set(err?.error?.message ?? err?.message ?? 'Preview failed.');
+      },
+    });
   }
 
   toggleFeed(feed: Feed): void {
@@ -552,8 +711,13 @@ export class SourcesComponent implements OnInit {
           error: err => this.handleSaveError(err),
         });
       } else if (this.activeTabMode === 'html') {
-        if (!this.validateUrl(this.formData.url) || !this.formData.name || !this.formData.listSelector) {
-          this.saveError.set('Name, valid URL and List Selector are required.');
+        if (!this.validateUrl(this.formData.url) || !this.formData.name) {
+          this.saveError.set('Name and a valid http(s) URL are required.');
+          this.saving.set(false);
+          return;
+        }
+        if (this.formData.discoveryMode === 'manual' && !this.formData.listSelector) {
+          this.saveError.set('Manual mode requires a List Selector. Switch to Auto or fill it in.');
           this.saving.set(false);
           return;
         }
@@ -623,6 +787,7 @@ export class SourcesComponent implements OnInit {
       url: p.url,
       description: p.description,
       type: p.type,
+      discoveryMode: p.discoveryMode ?? 'auto',
       listSelector: p.listSelector,
       titleSelector: p.titleSelector,
       linkSelector: p.linkSelector,

@@ -331,15 +331,23 @@ const DOW_MAP: Record<string, number> = {
     .tl-upcoming { background: rgba(255,255,255,0.04); color: var(--text-muted); border-color: var(--border-strong); }
     .terminal-card { display: flex; flex-direction: column; padding: 0 !important; overflow: hidden; }
     .terminal-header { padding: 16px 20px; border-bottom: 1px solid var(--border-light); background: var(--table-header-bg); }
-    .log-viewer { background: var(--log-bg); padding: 20px; overflow-y: auto; height: 480px; max-height: 480px; font-family: 'JetBrains Mono', monospace; display: block; }
+    .log-viewer { background: var(--log-bg); color: var(--log-fg); padding: 20px; overflow-y: auto; height: 480px; max-height: 480px; font-family: 'JetBrains Mono', monospace; display: block; }
     .log-viewer pre { color: var(--log-fg); font-size: 0.85rem; margin: 0; white-space: pre-wrap; word-break: break-all; }
+    /* Log viewer is always a terminal surface (dark) — force readable text
+       colors regardless of the active app theme. */
+    .log-viewer .muted { color: rgba(255, 255, 255, 0.55); }
+    .log-viewer th, .log-viewer td { color: var(--log-fg); border-bottom-color: rgba(255, 255, 255, 0.05); }
+    .log-viewer th { background: rgba(255, 255, 255, 0.04); color: rgba(255, 255, 255, 0.7); }
+    .log-viewer tr:hover td { background: rgba(255, 255, 255, 0.04); }
+    .log-viewer .text-primary { color: #f87171; }
+    .log-viewer .res-link { color: var(--link-color); }
     .tab-btn { background: transparent; border: none; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); padding: 6px 12px; border-radius: var(--radius-sm); transition: var(--transition); }
     .tab-btn:hover { color: var(--text-main); background: rgba(255,255,255,0.05); }
     .tab-btn.active { background: rgba(var(--primary-rgb),0.15); color: var(--primary-color); }
     .icon-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; transition: 0.2s; }
     .icon-btn:hover { color: var(--text-main); }
     .icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .history-table th { font-weight: 600; text-transform: uppercase; color: var(--text-muted); }
+    .history-table th { font-weight: 600; text-transform: uppercase; }
     .history-table td { border-bottom: 1px solid rgba(255,255,255,0.05); }
     .badge-mini { font-size: 0.6rem; padding: 1px 5px; border-radius: 4px; background: rgba(var(--primary-rgb),0.1); color: var(--primary-color); border: 1px solid rgba(var(--primary-rgb),0.2); }
     .badge-mini-manual { background: rgba(245,158,11,0.1); color: var(--warning-color); border-color: rgba(245,158,11,0.3); }

@@ -17,7 +17,15 @@ export interface Category {
   weight: number;
 }
 
-export interface Feed {
+export interface SourceHealth {
+  lastScanAt?: string;
+  lastScanStatus?: 'SUCCESS' | 'FAILURE';
+  lastScanError?: string;
+  consecutiveFailures?: number;
+  lastArticleCount?: number;
+}
+
+export interface Feed extends SourceHealth {
   id?: number;
   name: string;
   url: string;
@@ -37,13 +45,16 @@ export interface FeedRequest {
   categoryId?: number | null;
 }
 
-export interface HtmlPage {
+export type DiscoveryMode = 'auto' | 'manual';
+
+export interface HtmlPage extends SourceHealth {
   id?: number;
   name: string;
   url: string;
   description?: string;
   type: 'html_list' | 'html_detail';
-  listSelector: string;
+  discoveryMode: DiscoveryMode;
+  listSelector?: string;
   titleSelector?: string;
   linkSelector?: string;
   dateSelector?: string;
@@ -54,6 +65,14 @@ export interface HtmlPage {
 
 export interface HtmlPageRequest extends Omit<HtmlPage, 'category'> {
   categoryId?: number | null;
+}
+
+export interface HtmlPagePreview {
+  mode: DiscoveryMode;
+  discoveredSelector?: string;
+  totalFound: number;
+  items: { title: string; link: string }[];
+  rssLinks?: { title: string; type: string; url: string }[];
 }
 
 export interface TopicRule {

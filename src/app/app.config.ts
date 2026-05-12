@@ -13,9 +13,9 @@ import { appInterceptor } from './core/interceptors/app.interceptor';
 import { AuthService } from './core/services/auth.service';
 import {
   LucideAngularModule,
-  LayoutDashboard, Calendar, Settings, Database, Activity, RefreshCw, Play, Pause, PlayCircle,
-  PauseCircle, Trash2, Edit3, Globe, Plus, LogOut, Mail, Sliders, Save, Server, ShieldCheck,
-  Route, Layers, ArrowRightCircle, Check, Hash, Rss, X, Clock, Link2, Cog, User, Shield,
+  LayoutDashboard, Calendar, Settings, Settings2, Database, Activity, RefreshCw, Play, Pause, PlayCircle,
+  PauseCircle, Trash2, Edit3, Globe, Plus, LogOut, Mail, Sliders, Save, Server, ShieldCheck, ShieldPlus,
+  Route, Layers, ArrowRightCircle, Check, Hash, Rss, X, Clock, Link2, Cog, User, UserPlus, Shield,
   RotateCw, UserCog, ShieldUser, Sun, Moon, BarChart3, TrendingUp, Zap,
 } from 'lucide-angular';
 
@@ -33,10 +33,10 @@ export const appConfig: ApplicationConfig = {
 
     importProvidersFrom(
       LucideAngularModule.pick({
-        LayoutDashboard, Calendar, Settings, Database, Activity, RefreshCw, Play, Pause,
+        LayoutDashboard, Calendar, Settings, Settings2, Database, Activity, RefreshCw, Play, Pause,
         PlayCircle, PauseCircle, Trash2, Edit3, Globe, Plus, LogOut, Mail, Sliders, Save,
-        Server, ShieldCheck, Route, Layers, ArrowRightCircle, Check, Hash, Rss, X, Clock,
-        Link2, Cog, User, Shield, RotateCw, UserCog, ShieldUser,
+        Server, ShieldCheck, ShieldPlus, Route, Layers, ArrowRightCircle, Check, Hash, Rss, X, Clock,
+        Link2, Cog, User, UserPlus, Shield, RotateCw, UserCog, ShieldUser,
         Sun, Moon, BarChart3, TrendingUp, Zap,
       })
     ),

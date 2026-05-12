@@ -9,6 +9,7 @@ import {
   Feed,
   FeedRequest,
   HtmlPage,
+  HtmlPagePreview,
   HtmlPageRequest,
   PageResponse,
   Privilege,
@@ -103,6 +104,9 @@ export class ApiService {
   }
   savePage(page: HtmlPageRequest) { return this.http.post<HtmlPage>(`${this.baseUrl}/pages`, page); }
   deletePage(id: number) { return this.http.delete<void>(`${this.baseUrl}/pages/${id}`); }
+  previewPage(payload: { url: string; discoveryMode: 'auto' | 'manual'; listSelector?: string; titleSelector?: string; linkSelector?: string }) {
+    return this.http.post<HtmlPagePreview>(`${this.baseUrl}/pages/preview`, payload);
+  }
 
   // ---- Topic Rules ----
   loadTopics(params: PageParams = {}): void {
